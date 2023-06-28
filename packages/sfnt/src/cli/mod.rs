@@ -1,3 +1,5 @@
+use regex::Regex;
+
 use crate::types::FileType;
 use std::fs::File;
 use std::io::Read;
@@ -33,11 +35,21 @@ fn guess_file_type(file: &mut File) -> Option<FileType> {
     let head = &bytes[start_ind..(start_ind + 4)];
     match head {
         b"OTTO" => Some(FileType::OTF),
-        b"ttcf" => Some(FileType::TTF),
+        b"ttcf" => Some(FileType::TTC),
+        b"true" => Some(FileType::TTF),
+        b"\x00\x01\x00\x00" => Some(FileType::TTF),
         b"wOFF" => Some(FileType::WOFF),
         b"wOF2" => Some(FileType::WOFF2),
         b"<?xm" => {
-            unimplemented!()
+            // TODO: More Elegant Error handling
+            let str =
+                std::str::from_utf8(&bytes[start_ind..]).expect("Error converting bytes to string");
+            let re = Regex::new(r#"sfntVersion=['"]OTTO["']"#).expect("Regex Error");
+            if re.is_match(str) {
+                Some(FileType::OTX)
+            } else {
+                Some(FileType::TTX)
+            }
         }
         _ => None,
     }
