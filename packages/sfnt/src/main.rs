@@ -1,3 +1,8 @@
+mod cli;
+mod types;
 fn main() {
-    println!("Hello, world!");
+    match cli::run() {
+        Ok(_) => (),
+        Err(e) => println!("{}", e),
+    }
 }
