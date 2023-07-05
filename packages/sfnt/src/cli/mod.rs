@@ -1,23 +1,37 @@
 use regex::Regex;
 
+use crate::tt_lib::tt_font::TTFont;
 use crate::types::FileType;
 use std::fs::File;
 use std::io::Read;
 
 pub fn run() -> Result<(), String> {
-    let Some(second_arg) = std::env::args().nth(1) else {
+    let Some(input_path) = std::env::args().nth(1) else {
 		return Err(format!("Usage: {} [string]", file!()))
 	};
-    let Ok(mut file_handle) = File::open(&second_arg) else {
-		return Err(format!("Error opening file: {}", second_arg))
+    let Ok(mut file_handle) = File::open(&input_path) else {
+		return Err(format!("Error opening file: {}", input_path))
 	};
 
     let Some(file_type) = guess_file_type(&mut file_handle) else {
-		return Err(format!("Error guessing file type: {}", second_arg))
+		return Err(format!("Error guessing file type: {}", input_path))
 	};
-    println!("File type: {}", file_type);
 
-    Ok(())
+    match file_type {
+        FileType::OTF | FileType::TTC | FileType::TTF | FileType::WOFF | FileType::WOFF2 => {
+            // TODO: output path file options should be parsed
+            match tt_dump(&input_path, "") {
+                Ok(_) => Ok(()),
+                Err(_) => Err(format!("Error dumping file: {}", input_path)),
+            }
+        }
+        FileType::TTX => {
+            unimplemented!("TTX -> TTF should happen")
+        }
+        FileType::OTX => {
+            unimplemented!("OTX -> OTF should happen")
+        }
+    }
 }
 
 fn guess_file_type(file: &mut File) -> Option<FileType> {
@@ -53,4 +67,11 @@ fn guess_file_type(file: &mut File) -> Option<FileType> {
         }
         _ => None,
     }
+}
+
+fn tt_dump(input_path: &str, output_path: &str) -> std::io::Result<()> {
+    let font = TTFont::new(input_path).expect("Error initializing TTFont");
+    font.save_xml(output_path)?;
+    println!("TTFont should be dumped");
+    Ok(())
 }
