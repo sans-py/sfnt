@@ -26,10 +26,10 @@ const SFNT_DIRECTORY_ENTRY_FORMAT: &str = "
 ";
 
 pub fn get_sfnt_directory_size() -> usize {
-    calcsize(SFNT_DIRECTORY_FORMAT)
+    calcsize(SFNT_DIRECTORY_FORMAT).expect("calcsiz_error")
 }
 pub fn get_sfnt_directory_entry_size() -> usize {
-    calcsize(SFNT_DIRECTORY_ENTRY_FORMAT)
+    calcsize(SFNT_DIRECTORY_ENTRY_FORMAT).expect("calcsiz_error")
 }
 
 fn get_element_regex() -> Regex {
@@ -56,9 +56,46 @@ fn get_empty_regex() -> Regex {
     Regex::new(r"^\s*(#.*)?$").unwrap()
 }
 
-pub fn calcsize(format: &str) -> usize {
-    let format_string = getformat(format);
-    0
+pub fn calcsize(format: &str) -> Result<usize, String> {
+    let format_string = getformat(format)?;
+
+    let mut format_string = format_string.chars().peekable();
+
+    let endian = format_string.next().expect("Format string is too short");
+
+    let format_table = if endian == '<' {
+        &LIL_ENDIAN_TABLE
+    } else {
+        &BIG_ENDIAN_TABLE
+    };
+    let mut size = 0usize;
+
+    while let Some(c) = format_string.peek().clone() {
+        let mut num: usize = 1;
+        if c.is_ascii_digit() {
+            num = format_string.next().unwrap().to_digit(10).unwrap() as usize;
+            while let Some(c) = format_string.peek() {
+                if c.is_ascii_digit() {
+                    num = num * 10 + format_string.next().unwrap().to_digit(10).unwrap() as usize;
+                } else {
+                    break;
+                }
+            }
+            if format_string.peek().is_none() {
+                return Err(String::from("repeat count given without format specifier"));
+            }
+        }
+        let mut itemsize: usize = 0;
+        for format_def in format_table {
+            if format_def.format == *c {
+                itemsize = format_def.size;
+                break;
+            }
+        }
+        size += num * itemsize;
+    }
+
+    Ok(0)
 }
 fn getformat(fmt: &str) -> Result<String, String> {
     let delimiter = Regex::new("[\n;]").unwrap();
@@ -114,6 +151,37 @@ fn getformat(fmt: &str) -> Result<String, String> {
     Ok(format_string)
 }
 
+// format, size, alignment
+struct FormatDef {
+    format: char,
+    size: usize,
+    alignment: usize,
+}
+#[rustfmt::skip]
+const LIL_ENDIAN_TABLE: [FormatDef; 18] = [
+    FormatDef { format: 'x', size: 1, alignment: 0 },
+    FormatDef { format: 'b', size: 1, alignment: 0 },
+    FormatDef { format: 'B', size: 1, alignment: 0 },
+    FormatDef { format: 'c', size: 1, alignment: 0 },
+    FormatDef { format: 's', size: 1, alignment: 0 },
+    FormatDef { format: 'p', size: 1, alignment: 0 },
+    FormatDef { format: 'h', size: 2, alignment: 0 },
+    FormatDef { format: 'H', size: 2, alignment: 0 },
+    FormatDef { format: 'i', size: 4, alignment: 0 },
+    FormatDef { format: 'I', size: 4, alignment: 0 },
+    FormatDef { format: 'l', size: 4, alignment: 0 },
+    FormatDef { format: 'L', size: 4, alignment: 0 },
+    FormatDef { format: 'q', size: 8, alignment: 0 },
+    FormatDef { format: 'Q', size: 8, alignment: 0 },
+    FormatDef { format: '?', size: 1, alignment: 0 },
+    FormatDef { format: 'e', size: 2, alignment: 0 },
+    FormatDef { format: 'f', size: 4, alignment: 0 },
+    FormatDef { format: 'd', size: 8, alignment: 0 },
+];
+
+// alignment 가 조금 다른 것 같지만 여기선 안 쓰는 subset
+const BIG_ENDIAN_TABLE: [FormatDef; 18] = LIL_ENDIAN_TABLE;
+
 #[cfg(test)]
 mod sstruct_tests {
 
@@ -127,6 +195,7 @@ mod sstruct_tests {
     #[test]
     fn test_get_sfnt_directory_entry_format_string() {
         let format_string = getformat(SFNT_DIRECTORY_ENTRY_FORMAT);
+
         assert_eq!(format_string, Ok(String::from(">4sLLL")))
     }
 
