@@ -59,43 +59,53 @@ fn get_empty_regex() -> Regex {
 pub fn calcsize(format: &str) -> Result<usize, String> {
     let format_string = getformat(format)?;
 
-    let mut format_string = format_string.chars().peekable();
+    let format_string: Vec<char> = format_string.chars().collect();
 
-    let endian = format_string.next().expect("Format string is too short");
+    let endian = format_string.get(0).expect("Format string is too short");
 
-    let format_table = if endian == '<' {
+    let format_table = if *endian == '<' {
         &LIL_ENDIAN_TABLE
     } else {
         &BIG_ENDIAN_TABLE
     };
     let mut size = 0usize;
 
-    while let Some(c) = format_string.peek().clone() {
+    let mut index = 1;
+    let limit = format_string.len();
+
+    while index < limit {
+        let mut c = format_string[index];
         let mut num: usize = 1;
+
         if c.is_ascii_digit() {
-            num = format_string.next().unwrap().to_digit(10).unwrap() as usize;
-            while let Some(c) = format_string.peek() {
+            num = c.to_digit(10).unwrap() as usize;
+            index += 1;
+            while index < limit {
+                c = format_string[index];
                 if c.is_ascii_digit() {
-                    num = num * 10 + format_string.next().unwrap().to_digit(10).unwrap() as usize;
+                    num = num * 10 + c.to_digit(10).unwrap() as usize;
+                    index += 1;
                 } else {
                     break;
                 }
             }
-            if format_string.peek().is_none() {
+            if index == limit {
                 return Err(String::from("repeat count given without format specifier"));
             }
         }
-        let mut itemsize: usize = 0;
+
+        let mut item_size: usize = 0;
         for format_def in format_table {
-            if format_def.format == *c {
-                itemsize = format_def.size;
+            if format_def.format == c {
+                item_size = format_def.size;
                 break;
             }
         }
-        size += num * itemsize;
+        size += num * item_size;
+        index += 1;
     }
 
-    Ok(0)
+    Ok(size)
 }
 fn getformat(fmt: &str) -> Result<String, String> {
     let delimiter = Regex::new("[\n;]").unwrap();
