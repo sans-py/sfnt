@@ -1,5 +1,11 @@
 use regex::Regex;
 
+struct Format {
+    format_string: String,
+    names: Vec<String>,
+    fixes: Vec<String>,
+}
+
 const fn fixed_point_mappings(point: u8) -> Result<&'static str, ()> {
     match point {
         8 => Ok("b"),
@@ -57,9 +63,9 @@ fn get_empty_regex() -> Regex {
 }
 
 pub fn calcsize(format: &str) -> Result<usize, String> {
-    let format_string = getformat(format)?;
+    let format = get_format(format)?;
 
-    let format_string: Vec<char> = format_string.chars().collect();
+    let format_string: Vec<char> = format.format_string.chars().collect();
 
     let endian = format_string.get(0).expect("Format string is too short");
 
@@ -107,13 +113,16 @@ pub fn calcsize(format: &str) -> Result<usize, String> {
 
     Ok(size)
 }
-fn getformat(fmt: &str) -> Result<String, String> {
+
+fn get_format(fmt: &str) -> Result<Format, String> {
     let delimiter = Regex::new("[\n;]").unwrap();
     let lines = delimiter.split(fmt);
     let mut format_string = String::from("");
     let empty_regex = get_empty_regex();
     let extra_regex = get_extra_regex();
     let element_regex = get_element_regex();
+
+    let mut names: Vec<String> = vec![];
 
     for line in lines {
         if empty_regex.is_match(line) {
@@ -143,10 +152,13 @@ fn getformat(fmt: &str) -> Result<String, String> {
         let Some(matches) = element_regex.captures(line) else {
             return Err(format!("syntax error in fmt: {}", line));
         };
-        // let name = matches.get(0).unwrap().as_str();
+        let name = String::from(matches.get(1).unwrap().as_str());
         let mut format_char = matches.get(2).unwrap().as_str();
 
         // TODO: keep_pad_byte
+        if format_char != "x" {
+            names.push(String::from(name));
+        }
         if let Some(c) = matches.get(3) {
             let before: u8 = c.as_str().parse().unwrap();
             let after: u8 = matches.get(4).unwrap().as_str().parse().unwrap();
@@ -158,7 +170,11 @@ fn getformat(fmt: &str) -> Result<String, String> {
         }
         format_string.push_str(format_char);
     }
-    Ok(format_string)
+    Ok(Format {
+        format_string,
+        names,
+        fixes: vec![],
+    })
 }
 
 // format, size, alignment
@@ -196,17 +212,41 @@ const BIG_ENDIAN_TABLE: [FormatDef; 18] = LIL_ENDIAN_TABLE;
 mod sstruct_tests {
 
     use super::*;
+    use structure;
 
     #[test]
     fn test_get_sfnt_directory_format_string() {
-        let format_string = getformat(SFNT_DIRECTORY_FORMAT);
-        assert_eq!(format_string, Ok(String::from(">4sHHHH")))
+        let format = get_format(SFNT_DIRECTORY_FORMAT);
+        assert!(format.is_ok());
+        assert_eq!(format.as_ref().unwrap().format_string, ">4sHHHH");
+        assert_eq!(
+            format.unwrap().names,
+            vec![
+                String::from("sfnt_version"),
+                String::from("num_tables"),
+                String::from("search_range"),
+                String::from("entry_selector"),
+                String::from("range_shift")
+            ]
+        )
     }
     #[test]
     fn test_get_sfnt_directory_entry_format_string() {
-        let format_string = getformat(SFNT_DIRECTORY_ENTRY_FORMAT);
-
-        assert_eq!(format_string, Ok(String::from(">4sLLL")))
+        let format = get_format(SFNT_DIRECTORY_ENTRY_FORMAT);
+        assert!(format.is_ok());
+        assert_eq!(
+            format.as_ref().unwrap().format_string,
+            String::from(">4sLLL")
+        );
+        assert_eq!(
+            format.unwrap().names,
+            vec![
+                String::from("tag"),
+                String::from("checkSum"),
+                String::from("offset"),
+                String::from("length")
+            ]
+        )
     }
 
     #[test]
@@ -216,5 +256,25 @@ mod sstruct_tests {
     #[test]
     fn test_get_sfnt_directory_entry_size() {
         assert_eq!(get_sfnt_directory_entry_size(), 16)
+    }
+
+    #[test]
+    fn test_structure() {
+        let sfnt_directory = structure!(">4sHHHH");
+
+        let data = b"OTTO\x00\x11\x01\x00\x00\x04\x00\x10";
+
+        let unpacked = sfnt_directory.unpack(data);
+        assert!(unpacked.is_ok());
+        assert_eq!(
+            unpacked.unwrap(),
+            (
+                vec!['O' as u8, 'T' as u8, 'T' as u8, 'O' as u8],
+                17,
+                256,
+                4,
+                16
+            )
+        )
     }
 }

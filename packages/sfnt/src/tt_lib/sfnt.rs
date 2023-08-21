@@ -5,13 +5,12 @@ pub struct SFNTReader {}
 impl SFNTReader {
     pub fn new(mut file: std::fs::File) -> std::io::Result<Self> {
         file.seek(std::io::SeekFrom::Start(0))?;
-        let mut bytes = [0u8; 4];
-        file.read_exact(&mut bytes)?;
+        let mut sfnt_version = [0u8; 4];
+        file.read_exact(&mut sfnt_version)?;
         // can be b"wOFF", b"ttcf", or b"OTTO"
-        println!("is sfnt_version b\"OTTO\": {:?}", &bytes == b"OTTO");
         file.seek(std::io::SeekFrom::Start(0))?;
 
-        match &bytes {
+        match &sfnt_version {
             b"ttcf" => {
                 unimplemented!("SFNT Reader for True Type Collection not implemented")
             }
@@ -25,6 +24,12 @@ impl SFNTReader {
                     return Err(Error::new(ErrorKind::Other, "Not a TrueType or OpenType font (not enough data)"));
                 };
 
+                let sfnt_directory_struct = structure!(">4sHHHH");
+                let sfnt_directory = sfnt_directory_struct.unpack(&buf)?;
+
+                println!("{:?}", sfnt_directory);
+                let (sfnt_version, num_tables, search_range, entry_selector, range_shift) =
+                    sfnt_directory;
                 // open type or true type
             }
         }
