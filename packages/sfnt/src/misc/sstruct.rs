@@ -23,12 +23,12 @@ const SFNT_DIRECTORY_FORMAT: &str = "
     range_shift: H
 ";
 
-const SFNT_DIRECTORY_ENTRY_FORMAT: &str = "
+pub const SFNT_DIRECTORY_ENTRY_FORMAT: &str = "
 		> # big endian
 		tag:            4s
-		checkSum:       L
-		offset:         L
-		length:         L
+		checkSum:       I
+		offset:         I
+		length:         I
 ";
 
 pub fn get_sfnt_directory_size() -> usize {
@@ -236,7 +236,7 @@ mod sstruct_tests {
         assert!(format.is_ok());
         assert_eq!(
             format.as_ref().unwrap().format_string,
-            String::from(">4sLLL")
+            String::from(">4sIII")
         );
         assert_eq!(
             format.unwrap().names,
