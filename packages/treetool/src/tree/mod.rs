@@ -28,7 +28,7 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
             (data.len() as f64).log(degree as f64).ceil() as u32
         };
         let arr_size = degree.pow(max_level);
-        let mut body: Vec<Option<Node<T>>> = vec![None; arr_size];
+        let mut body: Vec<Option<Node<T>>> = vec![None; arr_size * degree];
 
         body[0] = Some(Node::Intermediate);
 
@@ -87,7 +87,7 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
 
         let windows = (range.0..range.1)
             .step_by(window_size)
-            .map(|v| (v, (v + window_size).min(self.len() - 1)));
+            .map(|v| (v, (v + window_size - 1).min(self.len() - 1)));
 
         for (i, (s, e)) in windows.enumerate() {
             if (s..e).contains(&i) {
@@ -110,7 +110,8 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
         window_size: usize,
         degree: usize,
     ) -> () {
-        if range.0 == range.1 {
+        // range.0 == range.1
+        if window_size == 0 {
             arr[cursor] = if let Some(value) = data.get(range.0) {
                 Some(Node::Terminal(*value))
             } else {
@@ -118,18 +119,17 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
             };
             return;
         }
-        // TODO: @ytw0728 음..? window_size == 0 인 경우가 왜 돌까? 디버깅 해보자.
-        if window_size == 0 {
-            return;
-        }
 
         arr[cursor] = Some(Node::Intermediate);
 
-        let windows = (range.0..range.1)
+        let windows = (range.0..range.1 + 1)
             .step_by(window_size)
-            .map(|v| (v, (v + degree).min(data.len() - 1)))
-            .filter(|(s, e)| range.0 <= *s && range.1 <= *e);
+            .map(|v| (v, (v + window_size - 1).min(data.len() - 1)))
+            .filter(|(s, e)| range.0 <= *s && *e <= range.1);
 
+        for (i, (s, e)) in windows.clone().enumerate() {
+            println!("{} {} {}", i, s, e);
+        }
         for (i, (s, e)) in windows.enumerate() {
             if e - s + 1 < window_size {
                 for p in (s - s)..(e - s) {
@@ -140,7 +140,7 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
                     data,
                     (s, e),
                     arr,
-                    cursor * degree + i,
+                    cursor * degree + i + 1,
                     window_size / degree,
                     degree,
                 )
@@ -154,7 +154,7 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
     fn print_recursive(&self, now: usize, level: usize) -> () {
         match self.body.get(now) {
             Some(Some(Node::Intermediate)) => {
-                for i in 0..self.degree {
+                for i in 1..self.degree {
                     self.print_recursive(now * self.degree + i, level + 1);
                 }
             }
