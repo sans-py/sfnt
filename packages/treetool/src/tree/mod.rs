@@ -37,13 +37,13 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
             (0, data.len() - 1),
             &mut body,
             0,
-            arr_size / degree,
+            arr_size,
             degree,
         );
 
         GenericTree {
             degree: degree,
-            length: data.len(),
+            length: body.len(),
             body: body,
         }
     }
@@ -110,13 +110,28 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
         window_size: usize,
         degree: usize,
     ) -> () {
-        // range.0 == range.1
-        if window_size == 0 {
+        if cfg!(debug_assertions) {
+            println!("({} ~ {}) => {} | | {}", range.0, range.1, cursor, window_size);
+        }
+
+        if range.1 == range.0 {
             arr[cursor] = if let Some(value) = data.get(range.0) {
                 Some(Node::Terminal(*value))
             } else {
                 None
             };
+
+            if cfg!(debug_assertions) {
+                for i in arr {
+                    match i {
+                        Some(Node::Intermediate) => print!("_ "),
+                        Some(Node::Terminal(i)) => print!("{} ", i),
+                        None => print!("x "),
+                    }
+                }
+                println!("    ({}, {} | {} _)", range.0, range.1, cursor);
+            }
+    
             return;
         }
 
@@ -127,24 +142,31 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
             .map(|v| (v, (v + window_size - 1).min(data.len() - 1)))
             .filter(|(s, e)| range.0 <= *s && *e <= range.1);
 
-        for (i, (s, e)) in windows.clone().enumerate() {
-            println!("{} {} {}", i, s, e);
-        }
         for (i, (s, e)) in windows.enumerate() {
-            if e - s + 1 < window_size {
-                for p in (s - s)..(e - s) {
-                    arr[cursor + i + p] = Some(Node::Terminal(data[s + p]));
-                }
+            let next_cursor = if i != 0 || (e - s + 1 < data.len() && e - s + 1 >= window_size) {
+                cursor * degree + i + 1
             } else {
-                GenericTree::build_recursive(
-                    data,
-                    (s, e),
-                    arr,
-                    cursor * degree + i + 1,
-                    window_size / degree,
-                    degree,
-                )
+                cursor
+            };
+            GenericTree::build_recursive(
+                data,
+                (s, e),
+                arr,
+                next_cursor,
+                window_size / degree,
+                degree,
+            )
+        }
+
+        if cfg!(debug_assertions) {
+            for i in arr {
+                match i {
+                    Some(Node::Intermediate) => print!("_ "),
+                    Some(Node::Terminal(i)) => print!("{} ", i),
+                    None => print!("x "),
+                }
             }
+            println!("    ({}, {} | {} __)", range.0, range.1, cursor);
         }
     }
 
@@ -154,7 +176,7 @@ impl<T: Clone + Copy + Display> GenericTree<T> {
     fn print_recursive(&self, now: usize, level: usize) -> () {
         match self.body.get(now) {
             Some(Some(Node::Intermediate)) => {
-                for i in 1..self.degree {
+                for i in 1..(self.degree + 1) {
                     self.print_recursive(now * self.degree + i, level + 1);
                 }
             }
