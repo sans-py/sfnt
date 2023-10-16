@@ -31,6 +31,13 @@ pub const SFNT_DIRECTORY_ENTRY_FORMAT: &str = "
 		length:         I
 ";
 
+pub fn unpack_sfnt_directory_struct(
+    buf: &mut [u8],
+) -> std::io::Result<(Vec<u8>, u16, u16, u16, u16)> {
+    let sfnt_directory_struct = structure!(">4sHHHH");
+    sfnt_directory_struct.unpack(&buf)
+}
+
 pub fn get_sfnt_directory_size() -> usize {
     calcsize(SFNT_DIRECTORY_FORMAT).expect("calcsiz_error")
 }

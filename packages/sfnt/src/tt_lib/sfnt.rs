@@ -1,4 +1,6 @@
-use crate::misc::sstruct::{get_sfnt_directory_entry_size, get_sfnt_directory_size};
+use crate::misc::sstruct::{
+    get_sfnt_directory_entry_size, get_sfnt_directory_size, unpack_sfnt_directory_struct,
+};
 use std::io::{Error, ErrorKind, Read, Seek};
 
 #[derive(Copy, Clone)]
@@ -43,8 +45,7 @@ impl SFNTReader {
                     return Err(Error::new(ErrorKind::Other, "Not a TrueType or OpenType font (not enough data)"));
                 };
 
-                let sfnt_directory_struct = structure!(">4sHHHH");
-                let sfnt_directory = sfnt_directory_struct.unpack(&buf)?;
+                let sfnt_directory = unpack_sfnt_directory_struct(&mut buf)?;
 
                 println!("{:?}", sfnt_directory);
                 let (sfnt_version, num_tables, search_range, entry_selector, range_shift) =
@@ -71,15 +72,18 @@ impl SFNTReader {
         match directory_entry_type {
             DirectoryEntryType::Sfnt => {
                 println!("");
+
                 let sfnt_directory_struct = structure!(">4sIII");
                 let size = get_sfnt_directory_entry_size();
                 let mut buf = vec![0u8; size];
 
                 file_handle.read_exact(&mut buf)?;
 
+                // entry: (Vec<u8>, u32, u32, u32)
                 let entry = sfnt_directory_struct.unpack(&buf)?;
 
                 let tag = std::str::from_utf8(&entry.0).unwrap().to_string();
+
                 println!("tag: {}", tag);
                 Ok(SfntDirectoryEntry {
                     tag: [entry.0[0], entry.0[1], entry.0[2], entry.0[3]],
