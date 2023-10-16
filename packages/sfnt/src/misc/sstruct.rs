@@ -31,10 +31,13 @@ pub const SFNT_DIRECTORY_ENTRY_FORMAT: &str = "
 		length:         I
 ";
 
-pub fn unpack_sfnt_directory_struct(
-    buf: &mut [u8],
-) -> std::io::Result<(Vec<u8>, u16, u16, u16, u16)> {
+pub fn unpack_sfnt_directory(buf: &mut [u8]) -> std::io::Result<(Vec<u8>, u16, u16, u16, u16)> {
     let sfnt_directory_struct = structure!(">4sHHHH");
+    sfnt_directory_struct.unpack(&buf)
+}
+
+pub fn unpack_sfnt_directory_entry(buf: &mut [u8]) -> std::io::Result<(Vec<u8>, u32, u32, u32)> {
+    let sfnt_directory_struct = structure!(">4sIII");
     sfnt_directory_struct.unpack(&buf)
 }
 
